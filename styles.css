@@ -30,7 +30,7 @@
 .kanto-heading strong{font-size:14px}
 .kanto-hint{margin-left:auto;color:var(--muted);font-size:10px}
 .kanto-strip{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:2px 2px 9px;scrollbar-width:thin;overscroll-behavior-x:contain}
-.kanto-card{flex:0 0 112px;width:112px;padding:5px;border:1px solid var(--line);border-radius:10px;background:#090d18;color:var(--text);cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:pan-x;transition:filter .15s,opacity .15s,border-color .15s,transform .15s}
+.kanto-card{flex:0 0 112px;width:112px;padding:5px;border:1px solid var(--line);border-radius:10px;background:#090d18;color:var(--text);cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:pan-y;transition:filter .15s,opacity .15s,border-color .15s,transform .15s}
 .kanto-card img{display:block;width:100%;height:145px;object-fit:contain;pointer-events:none;-webkit-user-drag:none}
 .kanto-card.missing img{filter:grayscale(1);opacity:.48}
 .kanto-card.owned img{filter:none;opacity:1}
