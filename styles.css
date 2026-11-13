@@ -17,3 +17,7 @@
 .qty button[data-a="plus"]:hover{background:#8b5cf666;transform:scale(1.06)}
 .qty button[data-a="minus"]{width:29px;height:29px}
 @media(max-width:520px){.binder-create{min-width:100%}.binder-picker{width:100%;justify-content:space-between}.binder-picker select{flex:1}.binder-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Keep filter checklists collapsed until their dropdown is opened */
+.filter-dropdown .filter-menu{display:none!important}
+.filter-dropdown.open .filter-menu{display:block!important}
