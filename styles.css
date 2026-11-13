@@ -39,3 +39,6 @@
 .kanto-card.dragging{opacity:.72;border:2px solid var(--cyan);transform:scale(1.04);z-index:2}
 .kanto-fallback{display:grid;place-items:center;height:145px;color:var(--muted);font-size:10px}
 @media(max-width:520px){.kanto-row{padding:10px}.kanto-card{flex-basis:100px;width:100px}.kanto-card img{height:132px}.kanto-hint{font-size:9px}}
+
+.kanto-card.dragging{pointer-events:none;opacity:.68;outline:2px solid var(--cyan);outline-offset:1px}
+.kanto-card.owned{border-color:#8b5cf688}
