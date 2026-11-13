@@ -1,10 +1,10 @@
 const PRIVATE_REPO="cedarparkjacob/PTCGP-Collection-Private",DATA_URL="./data/cards.json",IMAGE_BASE="https://raw.githubusercontent.com/Vociferix/ptcgp-images/master/",LOCAL_KEY="pocketdex.collection.v1";
-let cards=[],sets=[],collection={schema_version:1,updated_at:null,cards:{},binders:[],kantoOrder:{}},activeView="collection",activeBinderId="",githubToken="",catalogReady=false,kantoHoldTimer=null,kantoDrag=null,kantoGesture=null,kantoDragged=false,kantoSuppressClickUntil=0,kantoHoldStartX=0,kantoHoldStartY=0;
+let cards=[],sets=[],collection={schema_version:1,updated_at:null,cards:{},binders:[],kantoOrder:{}},activeView="collection",activeBinderId="",githubToken="",catalogReady=false,kantoHoldTimer=null,kantoDrag=null,kantoGesture=null,kantoDragged=false,kantoSuppressClickUntil=0,kantoHoldStartX=0,kantoHoldStartY=0,kantoFocusDex=null;
 const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function loadLocal(){try{const x=JSON.parse(localStorage.getItem(LOCAL_KEY)||"null");if(x?.cards)collection=x;if(!Array.isArray(collection.binders))collection.binders=[];if(!collection.kantoOrder||typeof collection.kantoOrder!=="object")collection.kantoOrder={}}catch(e){console.warn(e)}}
 function saveLocal(){collection.updated_at=new Date().toISOString();try{localStorage.setItem(LOCAL_KEY,JSON.stringify(collection))}catch(e){console.warn(e)}}
 function qty(id){return Number(collection.cards[id]?.owned||0)}function wished(id){return!!collection.cards[id]?.wishlist}
-function change(id,n){const x=collection.cards[id]||(collection.cards[id]={owned:0,wishlist:false});x.owned=Math.max(0,Math.min(999,x.owned+n));if(!x.owned&&!x.wishlist)delete collection.cards[id];saveLocal();render()}
+function change(id,n){const x=collection.cards[id]||(collection.cards[id]={owned:0,wishlist:false});x.owned=Math.max(0,Math.min(999,x.owned+n));if(!x.owned&&!x.wishlist)delete collection.cards[id];if(activeView==="kanto151"&&n>0){const c=cards.find(v=>v.id===id);if(c)kantoFocusDex=String(c.natdex_number)}saveLocal();render()}
 function wish(id){const x=collection.cards[id]||(collection.cards[id]={owned:0,wishlist:false});x.wishlist=!x.wishlist;if(!x.owned&&!x.wishlist)delete collection.cards[id];saveLocal();render()}
 function totals(){const owned=cards.filter(c=>qty(c.id)>0),unique=new Set(owned.filter(c=>c.card_type==="pokemon"&&c.natdex_number).map(c=>c.natdex_number));return{total:cards.length,versions:owned.length,quantity:owned.reduce((n,c)=>n+qty(c.id),0),pokemon:unique.size,pct:cards.length?Math.round(owned.length/cards.length*100):0}}
 function filterOptions(id,items){$("#"+id).innerHTML=items.map(([v,n])=>'<label><input type="checkbox" value="'+esc(v)+'"> '+esc(n)+'</label>').join("")}
@@ -16,26 +16,40 @@ function filtered(){const q=$("#search").value.toLowerCase().trim(),setsOn=selec
 function cardHTML(c,binderId=null){return '<article class="card"><div class="card-image"><img loading="lazy" src="'+esc(IMAGE_BASE+c.image)+'" alt="'+esc(c.name)+'" onerror="this.outerHTML=\'<div class=fallback>Image unavailable</div>\'"></div><div class="card-info"><div class="card-title" title="'+esc(c.name)+'">'+esc(c.name)+'</div><div class="card-sub">'+esc(c.set+" · "+c.number_label+" · "+(c.natdex_number?"#"+c.natdex_number:"Trainer"))+'</div><div class="card-tags"><span class="tag">'+esc(c.rarity_name||c.rarity||"Promo")+'</span>'+(c.is_foil?'<span class="tag">Foil</span>':"")+(c.is_reprint?'<span class="tag">Reprint</span>':"")+'</div><div class="card-controls"><div class="qty"><button data-a="minus" data-id="'+c.id+'">−</button><span>'+qty(c.id)+'</span><button data-a="plus" data-id="'+c.id+'">+</button></div><button class="heart '+(wished(c.id)?"on":"")+'" data-a="wish" data-id="'+c.id+'">♥</button>'+(binderId?'<button class="binder-card-toggle" data-a="binder-toggle" data-id="'+c.id+'">'+(collection.binders.find(x=>x.id===binderId)?.cardIds.includes(c.id)?'Remove':'Add to binder')+'</button>':'')+'</div></div></article>'}
 function renderCards(list){$("#result-count").textContent=list.length.toLocaleString()+" card versions";$("#content").className="card-grid";$("#content").innerHTML=list.length?list.slice(0,500).map(cardHTML).join(""):'<div class="empty">No cards match these filters.</div>';if(list.length>500)$("#result-count").textContent+=" · showing first 500; narrow search"}
 function renderSets(){$("#content").className="panel-grid";$("#content").innerHTML=sets.map(s=>{const g=cards.filter(c=>c.set===s.code),h=g.filter(c=>qty(c.id)>0).length,p=g.length?Math.round(h/g.length*100):0;return '<article class="set-panel"><h3>'+esc(s.name)+'</h3><p>'+esc(s.code)+(s.is_promo?" · Promo":"")+' · '+g.length+' versions</p><div class="progress"><span style="width:'+p+'%"></span></div><div class="progress-label"><span>'+h+' / '+g.length+' owned</span><span>'+p+'%</span></div></article>'}).join("");$("#result-count").textContent=sets.length+" expansions"}
+function rarityRank(c){
+ const ranks={C:1,U:2,R:3,RR:4,AR:5,SR:6,SAR:6.5,IM:7,S:8,SSR:9,UR:10};
+ return ranks[String(c.rarity||"").toUpperCase()]||0;
+}
 function renderKanto151(){
  const scrollPositions=new Map([...document.querySelectorAll(".kanto-strip")].map(s=>[s.closest(".kanto-row").dataset.dex,s.scrollLeft]));
  const byDex=new Map();
  cards.filter(c=>c.card_type==="pokemon"&&Number(c.natdex_number)>=1&&Number(c.natdex_number)<=151).forEach(c=>{const n=Number(c.natdex_number);if(!byDex.has(n))byDex.set(n,[]);byDex.get(n).push(c)});
- const setOrder=new Map(sets.map((s,i)=>[s.code,i]));
  const groups=[...byDex.entries()].sort((a,b)=>a[0]-b[0]);
  const versionCount=groups.reduce((n,[,a])=>n+a.length,0);
  $("#content").className="kanto-list";
  $("#result-count").textContent=groups.length+" Pokémon · "+versionCount.toLocaleString()+" card versions";
- $("#view-caption").textContent="ORIGINAL 151 · DEX ORDER";
+ $("#view-caption").textContent="ORIGINAL 151 · OWNED FIRST · RAREST LEFT";
  $("#content").innerHTML=groups.map(([dex,items])=>{
-   const base=items.slice().sort((a,b)=>(setOrder.get(a.set)??9999)-(setOrder.get(b.set)??9999)||String(a.number_label||"").localeCompare(String(b.number_label||""),undefined,{numeric:true})||String(a.name).localeCompare(String(b.name)));
+   const base=items.slice().sort((a,b)=>String(a.number_label||"").localeCompare(String(b.number_label||""),undefined,{numeric:true})||String(a.name).localeCompare(String(b.name)));
    const saved=Array.isArray(collection.kantoOrder[String(dex)])?collection.kantoOrder[String(dex)]:[];
-   const byId=new Map(base.map(c=>[c.id,c]));
-   const ordered=saved.map(id=>byId.get(id)).filter(Boolean);
-   const used=new Set(ordered.map(c=>c.id));
-   base.forEach(c=>{if(!used.has(c.id))ordered.push(c)});
-   return '<section class="kanto-row" data-dex="'+dex+'"><div class="kanto-heading"><span class="kanto-number">#'+String(dex).padStart(3,"0")+'</span><strong>'+esc(base[0]?.name||"")+'</strong><span class="kanto-hint">Hold and drag to reorder</span></div><div class="kanto-strip">'+ordered.map(c=>'<button type="button" class="kanto-card '+(qty(c.id)>0?'owned':'missing')+'" data-a="kanto-add" data-id="'+esc(c.id)+'" data-dex="'+dex+'" title="'+esc(c.name+" · "+c.set+" · "+c.number_label)+'" aria-label="Add '+esc(c.name+" "+c.set+" "+c.number_label)+' to collection"><img loading="lazy" draggable="false" src="'+esc(IMAGE_BASE+c.image)+'" alt="'+esc(c.name)+'" onerror="this.outerHTML=\'<span class=kanto-fallback>Image unavailable</span>\'"><span class="kanto-card-label">'+esc(c.set+" · "+c.number_label)+'</span></button>').join("")+'</div></section>';
+   const manualOrder=new Map(saved.map((id,i)=>[id,i]));
+   const ordered=base.slice().sort((a,b)=>{
+     const ownedDiff=Number(qty(b.id)>0)-Number(qty(a.id)>0);
+     if(ownedDiff)return ownedDiff;
+     const rarityDiff=rarityRank(b)-rarityRank(a);
+     if(rarityDiff)return rarityDiff;
+     return (manualOrder.get(a.id)??999999)-(manualOrder.get(b.id)??999999)
+       ||String(a.number_label||"").localeCompare(String(b.number_label||""),undefined,{numeric:true})
+       ||String(a.name).localeCompare(String(b.name));
+   });
+   return '<section class="kanto-row" data-dex="'+dex+'"><div class="kanto-heading"><span class="kanto-number">#'+String(dex).padStart(3,"0")+'</span><strong>'+esc(base[0]?.name||"")+'</strong><span class="kanto-hint">Hold card, then drag · Swipe to scroll</span></div><div class="kanto-strip">'+ordered.map(c=>'<button type="button" class="kanto-card '+(qty(c.id)>0?'owned':'missing')+'" data-a="kanto-add" data-id="'+esc(c.id)+'" data-dex="'+dex+'" title="'+esc(c.name+" · "+c.set+" · "+c.number_label+" · "+(c.rarity_name||c.rarity||""))+'" aria-label="Add '+esc(c.name+" "+c.set+" "+c.number_label)+' to collection"><img loading="lazy" draggable="false" src="'+esc(IMAGE_BASE+c.image)+'" alt="'+esc(c.name)+'" onerror="this.outerHTML=\'<span class=kanto-fallback>Image unavailable</span>\'"><span class="kanto-card-label">'+esc((c.rarity_name||c.rarity||"Card")+" · "+c.set+" · "+c.number_label)+'</span></button>').join("")+'</div></section>';
  }).join("");
- document.querySelectorAll(".kanto-row").forEach(row=>{const saved=scrollPositions.get(row.dataset.dex);if(saved!==undefined)row.querySelector(".kanto-strip").scrollLeft=saved});
+ document.querySelectorAll(".kanto-row").forEach(row=>{
+   const dex=row.dataset.dex;
+   if(kantoFocusDex===dex)row.querySelector(".kanto-strip").scrollLeft=0;
+   else {const saved=scrollPositions.get(dex);if(saved!==undefined)row.querySelector(".kanto-strip").scrollLeft=saved}
+ });
+ kantoFocusDex=null;
 }
 function renderDex(){const m=new Map();cards.filter(c=>c.card_type==="pokemon"&&c.natdex_number).forEach(c=>{let p=m.get(c.natdex_number)||{name:c.name,n:c.natdex_number,total:0,owned:0};p.total++;if(qty(c.id))p.owned++;m.set(c.natdex_number,p)});const a=[...m.values()].sort((x,y)=>x.n-y.n);$("#content").className="panel-grid";$("#content").innerHTML=a.map(p=>'<article class="dex-panel"><span class="dex-number">#'+String(p.n).padStart(4,"0")+'</span><div><h3>'+esc(p.name)+'</h3><p>'+p.owned+' of '+p.total+' versions owned</p></div><span class="dex-count">'+(p.owned?"●":"○")+'</span></article>').join("");$("#result-count").textContent=a.length+" unique Pokémon"}
 
@@ -57,13 +71,18 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(!b
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>view(b.dataset.view)));
 document.addEventListener("pointerdown",e=>{
  const card=e.target.closest(".kanto-card");if(!card||activeView!=="kanto151"||e.button!==0)return;
- clearTimeout(kantoHoldTimer);kantoDragged=false;
- kantoHoldStartX=e.clientX;kantoHoldStartY=e.clientY;
- kantoGesture={card,strip:card.parentElement,startX:e.clientX,startY:e.clientY,startScroll:card.parentElement.scrollLeft,scrolling:false};
- kantoHoldTimer=setTimeout(()=>{if(!kantoGesture?.scrolling){kantoDrag={card,dex:card.dataset.dex};card.classList.add("dragging");kantoDragged=true}},380);
+ clearTimeout(kantoHoldTimer);kantoDrag=null;
+ kantoGesture={card,strip:card.parentElement,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,startScroll:card.parentElement.scrollLeft,scrolling:false,dragging:false};
+ kantoHoldTimer=setTimeout(()=>{
+   if(!kantoGesture||kantoGesture.card!==card||kantoGesture.scrolling)return;
+   kantoGesture.dragging=true;kantoDrag={card,dex:card.dataset.dex,pointerId:e.pointerId};
+   card.classList.add("dragging");
+   try{card.setPointerCapture(e.pointerId)}catch(err){}
+ },450);
 });
 document.addEventListener("pointermove",e=>{
- if(kantoDrag){
+ if(!kantoGesture||e.pointerId!==kantoGesture.pointerId)return;
+ if(kantoDrag&&kantoDrag.pointerId===e.pointerId){
    e.preventDefault();
    const target=document.elementFromPoint(e.clientX,e.clientY)?.closest(".kanto-card");
    if(!target||target===kantoDrag.card||target.dataset.dex!==kantoDrag.dex)return;
@@ -72,24 +91,25 @@ document.addEventListener("pointermove",e=>{
    else strip.insertBefore(kantoDrag.card,target.nextSibling);
    return;
  }
- if(!kantoGesture)return;
  const dx=e.clientX-kantoGesture.startX,dy=e.clientY-kantoGesture.startY;
- if(!kantoGesture.scrolling&&Math.hypot(dx,dy)>8){
+ if(!kantoGesture.scrolling&&!kantoGesture.dragging&&Math.hypot(dx,dy)>8){
    clearTimeout(kantoHoldTimer);kantoHoldTimer=null;
    if(Math.abs(dx)>Math.abs(dy))kantoGesture.scrolling=true;
  }
  if(kantoGesture.scrolling){e.preventDefault();kantoGesture.strip.scrollLeft=kantoGesture.startScroll-dx}
 });
-document.addEventListener("pointerup",()=>{
+document.addEventListener("pointerup",e=>{
+ if(!kantoGesture||e.pointerId!==kantoGesture.pointerId)return;
  clearTimeout(kantoHoldTimer);kantoHoldTimer=null;
- if(kantoDrag){
+ if(kantoDrag&&kantoDrag.pointerId===e.pointerId){
    const {card,dex}=kantoDrag,strip=card.parentElement;
    collection.kantoOrder[String(dex)]=[...strip.querySelectorAll(".kanto-card")].map(x=>x.dataset.id);
-   card.classList.remove("dragging");kantoDrag=null;kantoSuppressClickUntil=Date.now()+550;saveLocal();
- }else if(kantoGesture?.scrolling){kantoSuppressClickUntil=Date.now()+350}
+   card.classList.remove("dragging");kantoDrag=null;kantoSuppressClickUntil=Date.now()+600;saveLocal();
+ }else if(kantoGesture.scrolling){kantoSuppressClickUntil=Date.now()+350}
  kantoGesture=null;
 });
-document.addEventListener("pointercancel",()=>{
+document.addEventListener("pointercancel",e=>{
+ if(!kantoGesture||e.pointerId!==kantoGesture.pointerId)return;
  clearTimeout(kantoHoldTimer);kantoHoldTimer=null;
  if(kantoDrag){kantoDrag.card.classList.remove("dragging");kantoDrag=null}
  kantoGesture=null;
