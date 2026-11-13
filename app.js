@@ -57,10 +57,10 @@ document.addEventListener("pointerdown",e=>{
  const card=e.target.closest(".kanto-card");if(!card||activeView!=="kanto151"||e.button!==0)return;
  clearTimeout(kantoHoldTimer);kantoDragged=false;
  kantoHoldStartX=e.clientX;kantoHoldStartY=e.clientY;
- kantoHoldTimer=setTimeout(()=>{kantoDrag={card,dex:card.dataset.dex,startX:kantoHoldStartX,startY:kantoHoldStartY};card.classList.add("dragging");kantoDragged=true},380);
+ kantoGesture={card,strip:card.parentElement,startX:e.clientX,startY:e.clientY,startScroll:card.parentElement.scrollLeft,scrolling:false};
+ kantoHoldTimer=setTimeout(()=>{if(!kantoGesture?.scrolling){kantoDrag={card,dex:card.dataset.dex};card.classList.add("dragging");kantoDragged=true}},380);
 });
 document.addEventListener("pointermove",e=>{
- if(!kantoHoldTimer&&!kantoDrag)return;
  if(kantoDrag){
    e.preventDefault();
    const target=document.elementFromPoint(e.clientX,e.clientY)?.closest(".kanto-card");
@@ -68,17 +68,30 @@ document.addEventListener("pointermove",e=>{
    const strip=target.parentElement,rect=target.getBoundingClientRect();
    if(e.clientX<rect.left+rect.width/2)strip.insertBefore(kantoDrag.card,target);
    else strip.insertBefore(kantoDrag.card,target.nextSibling);
- }else if(Math.abs(e.clientX-(kantoHoldStartX??e.clientX))>8||Math.abs(e.clientY-(kantoHoldStartY??e.clientY))>8){clearTimeout(kantoHoldTimer);kantoHoldTimer=null}
+   return;
+ }
+ if(!kantoGesture)return;
+ const dx=e.clientX-kantoGesture.startX,dy=e.clientY-kantoGesture.startY;
+ if(!kantoGesture.scrolling&&Math.hypot(dx,dy)>8){
+   clearTimeout(kantoHoldTimer);kantoHoldTimer=null;
+   if(Math.abs(dx)>Math.abs(dy))kantoGesture.scrolling=true;
+ }
+ if(kantoGesture.scrolling){e.preventDefault();kantoGesture.strip.scrollLeft=kantoGesture.startScroll-dx}
 });
 document.addEventListener("pointerup",()=>{
  clearTimeout(kantoHoldTimer);kantoHoldTimer=null;
- if(!kantoDrag)return;
- const {card,dex}=kantoDrag,strip=card.parentElement;
- collection.kantoOrder[String(dex)]=[...strip.querySelectorAll(".kanto-card")].map(x=>x.dataset.id);
- card.classList.remove("dragging");kantoDrag=null;kantoSuppressClickUntil=Date.now()+550;saveLocal();
+ if(kantoDrag){
+   const {card,dex}=kantoDrag,strip=card.parentElement;
+   collection.kantoOrder[String(dex)]=[...strip.querySelectorAll(".kanto-card")].map(x=>x.dataset.id);
+   card.classList.remove("dragging");kantoDrag=null;kantoSuppressClickUntil=Date.now()+550;saveLocal();
+ }else if(kantoGesture?.scrolling){kantoSuppressClickUntil=Date.now()+350}
+ kantoGesture=null;
 });
-document.addEventListener("pointercancel",()=>{clearTimeout(kantoHoldTimer);kantoHoldTimer=null;if(kantoDrag){kantoDrag.card.classList.remove("dragging");kantoDrag=null}});
-
+document.addEventListener("pointercancel",()=>{
+ clearTimeout(kantoHoldTimer);kantoHoldTimer=null;
+ if(kantoDrag){kantoDrag.card.classList.remove("dragging");kantoDrag=null}
+ kantoGesture=null;
+});
 document.addEventListener("change",e=>{if(e.target.id==="binder-select"){activeBinderId=e.target.value;renderBinders()}});
 document.querySelectorAll(".filter-toggle").forEach(b=>b.addEventListener("click",()=>{const d=b.closest(".filter-dropdown"),open=!d.classList.contains("open");closeFilterMenus(d);d.classList.toggle("open",open);b.setAttribute("aria-expanded",String(open))}));
 document.addEventListener("click",e=>{if(!e.target.closest(".filter-dropdown"))closeFilterMenus()});
