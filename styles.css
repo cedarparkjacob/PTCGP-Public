@@ -42,3 +42,5 @@
 
 .kanto-card.dragging{pointer-events:none;opacity:.68;outline:2px solid var(--cyan);outline-offset:1px}
 .kanto-card.owned{border-color:#8b5cf688}
+
+.binder-columns{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px}.binder-columns select{background:#090d18;border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--text);min-width:66px}
