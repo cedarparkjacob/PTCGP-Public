@@ -31,17 +31,7 @@ function renderKanto151(){
  $("#view-caption").textContent="ORIGINAL 151 · OWNED FIRST · RAREST LEFT";
  $("#content").innerHTML=groups.map(([dex,items])=>{
    const base=items.slice().sort((a,b)=>String(a.number_label||"").localeCompare(String(b.number_label||""),undefined,{numeric:true})||String(a.name).localeCompare(String(b.name)));
-   const saved=Array.isArray(collection.kantoOrder[String(dex)])?collection.kantoOrder[String(dex)]:[];
-   const manualOrder=new Map(saved.map((id,i)=>[id,i]));
-   const ordered=base.slice().sort((a,b)=>{
-     const ownedDiff=Number(qty(b.id)>0)-Number(qty(a.id)>0);
-     if(ownedDiff)return ownedDiff;
-     const rarityDiff=rarityRank(b)-rarityRank(a);
-     if(rarityDiff)return rarityDiff;
-     return (manualOrder.get(a.id)??999999)-(manualOrder.get(b.id)??999999)
-       ||String(a.number_label||"").localeCompare(String(b.number_label||""),undefined,{numeric:true})
-       ||String(a.name).localeCompare(String(b.name));
-   });
+   const ordered=orderedKantoItems(dex,items);
    return '<section class="kanto-row" data-dex="'+dex+'"><div class="kanto-heading"><span class="kanto-number">#'+String(dex).padStart(3,"0")+'</span><strong>'+esc(base[0]?.name||"")+'</strong><span class="kanto-hint">Hold card, then drag · Swipe to scroll</span></div><div class="kanto-strip">'+ordered.map(c=>'<button type="button" class="kanto-card '+(qty(c.id)>0?'owned':'missing')+'" data-a="kanto-add" data-id="'+esc(c.id)+'" data-dex="'+dex+'" title="'+esc(c.name+" · "+c.set+" · "+c.number_label+" · "+(c.rarity_name||c.rarity||""))+'" aria-label="Add '+esc(c.name+" "+c.set+" "+c.number_label)+' to collection"><img loading="lazy" draggable="false" src="'+esc(IMAGE_BASE+c.image)+'" alt="'+esc(c.name)+'" onerror="this.outerHTML=\'<span class=kanto-fallback>Image unavailable</span>\'"><span class="kanto-card-label">'+esc((c.rarity_name||c.rarity||"Card")+" · "+c.set+" · "+c.number_label)+'</span></button>').join("")+'</div></section>';
  }).join("");
  document.querySelectorAll(".kanto-row").forEach(row=>{
@@ -53,10 +43,35 @@ function renderKanto151(){
 }
 function renderDex(){const m=new Map();cards.filter(c=>c.card_type==="pokemon"&&c.natdex_number).forEach(c=>{let p=m.get(c.natdex_number)||{name:c.name,n:c.natdex_number,total:0,owned:0};p.total++;if(qty(c.id))p.owned++;m.set(c.natdex_number,p)});const a=[...m.values()].sort((x,y)=>x.n-y.n);$("#content").className="panel-grid";$("#content").innerHTML=a.map(p=>'<article class="dex-panel"><span class="dex-number">#'+String(p.n).padStart(4,"0")+'</span><div><h3>'+esc(p.name)+'</h3><p>'+p.owned+' of '+p.total+' versions owned</p></div><span class="dex-count">'+(p.owned?"●":"○")+'</span></article>').join("");$("#result-count").textContent=a.length+" unique Pokémon"}
 
-function activeBinder(){return collection.binders.find(b=>b.id===activeBinderId)||collection.binders[0]||null}
+const KANTO_BINDER_ID="original-151-auto";
+function orderedKantoItems(dex,items){
+ const base=items.slice().sort((a,b)=>String(a.number_label||"").localeCompare(String(b.number_label||""),undefined,{numeric:true})||String(a.name).localeCompare(String(b.name)));
+ const saved=Array.isArray(collection.kantoOrder[String(dex)])?collection.kantoOrder[String(dex)]:[];
+ const manualOrder=new Map(saved.map((id,i)=>[id,i]));
+ return base.slice().sort((a,b)=>{
+   const ownedDiff=Number(qty(b.id)>0)-Number(qty(a.id)>0);
+   if(ownedDiff)return ownedDiff;
+   const rarityDiff=rarityRank(b)-rarityRank(a);
+   if(rarityDiff)return rarityDiff;
+   return (manualOrder.get(a.id)??999999)-(manualOrder.get(b.id)??999999)
+     ||String(a.number_label||"").localeCompare(String(b.number_label||""),undefined,{numeric:true})
+     ||String(a.name).localeCompare(String(b.name));
+ });
+}
+function original151BinderCards(){
+ const groups=new Map();
+ cards.filter(c=>c.card_type==="pokemon"&&Number(c.natdex_number)>=1&&Number(c.natdex_number)<=151).forEach(c=>{
+   const dex=Number(c.natdex_number);if(!groups.has(dex))groups.set(dex,[]);groups.get(dex).push(c);
+ });
+ return [...groups.entries()].sort((a,b)=>a[0]-b[0]).map(([dex,items])=>orderedKantoItems(dex,items)[0]).filter(Boolean);
+}
+function activeBinder(){
+ if(activeBinderId===KANTO_BINDER_ID)return{id:KANTO_BINDER_ID,name:"Original 151",cardIds:original151BinderCards().map(c=>c.id),automatic:true};
+ return collection.binders.find(b=>b.id===activeBinderId)||collection.binders[0]||null
+}
 function createBinder(){const input=$("#binder-name"),name=input.value.trim();if(!name){input.focus();return}const b={id:"binder-"+Date.now(),name:name,cardIds:[]};collection.binders.push(b);activeBinderId=b.id;input.value="";saveLocal();renderBinders()}
 function toggleBinderCard(id){const b=activeBinder();if(!b)return;const i=b.cardIds.indexOf(id);if(i>=0)b.cardIds.splice(i,1);else if(qty(id)>0)b.cardIds.push(id);saveLocal();renderBinders()}
-function renderBinders(){if(!Array.isArray(collection.binders))collection.binders=[];let b=activeBinder();if(b)activeBinderId=b.id;const options=collection.binders.map(x=>'<option value="'+esc(x.id)+'" '+(b&&x.id===b.id?'selected':'')+'>'+esc(x.name)+'</option>').join('');const owned=cards.filter(c=>qty(c.id)>0);const inBinder=b?owned.filter(c=>b.cardIds.includes(c.id)):[];const available=b?owned.filter(c=>!b.cardIds.includes(c.id)):[];$("#content").className="binder-view";$("#result-count").textContent=collection.binders.length+" binders · "+owned.length+" owned card versions available";$("#content").innerHTML='<div class="binder-toolbar"><div class="binder-create"><input id="binder-name" type="text" maxlength="40" placeholder="New binder name"><button class="primary" data-a="binder-create">Create binder</button></div>'+(b?'<label class="binder-picker">Current binder <select id="binder-select">'+options+'</select></label>':'')+'</div>'+(b?'<section class="binder-section"><div class="binder-section-head"><div><h2>'+esc(b.name)+'</h2><p>'+inBinder.length+' owned card versions in this binder</p></div></div><div class="binder-card-grid">'+(inBinder.length?inBinder.map(c=>cardHTML(c,b.id)).join(''):'<div class="empty">This binder is empty. Add cards from your owned collection below.</div>')+'</div></section><section class="binder-section"><h3>Add owned cards</h3><div class="binder-card-grid">'+(available.length?available.map(c=>cardHTML(c,b.id)).join(''):'<div class="empty">'+(owned.length?'All owned cards are already in this binder.':'No owned cards yet. Use the + button in Collection to record cards you own.')+'</div>')+'</div></section>':'<div class="empty">Create your first binder to organize selected cards you own.</div>')}
+function renderBinders(){if(!Array.isArray(collection.binders))collection.binders=[];if(!activeBinderId)activeBinderId=collection.binders[0]?.id||KANTO_BINDER_ID;let b=activeBinder();if(b)activeBinderId=b.id;const options='<option value="'+KANTO_BINDER_ID+'" '+(b?.id===KANTO_BINDER_ID?'selected':'')+'>Original 151 · Auto</option>'+collection.binders.map(x=>'<option value="'+esc(x.id)+'" '+(b&&x.id===b.id?'selected':'')+'>'+esc(x.name)+'</option>').join('');const owned=cards.filter(c=>qty(c.id)>0);const inBinder=b?(b.automatic?original151BinderCards():owned.filter(c=>b.cardIds.includes(c.id))):[];const available=b&&!b.automatic?owned.filter(c=>!b.cardIds.includes(c.id)):[];$("#content").className="binder-view";$("#result-count").textContent=(collection.binders.length+1)+" binders · "+owned.length+" owned card versions available";$("#content").innerHTML='<div class="binder-toolbar"><div class="binder-create"><input id="binder-name" type="text" maxlength="40" placeholder="New binder name"><button class="primary" data-a="binder-create">Create binder</button></div>'+(b?'<label class="binder-picker">Current binder <select id="binder-select">'+options+'</select></label>':'')+'</div>'+(b?'<section class="binder-section"><div class="binder-section-head"><div><h2>'+esc(b.name)+'</h2><p>'+(b.automatic?'One card per Pokémon · '+inBinder.length+' Pokémon · follows the far-left card in Original 151':inBinder.length+' owned card versions in this binder')+'</p></div></div><div class="binder-card-grid">'+(inBinder.length?inBinder.map(c=>cardHTML(c,b.automatic?null:b.id)).join(''):'<div class="empty">No cards are available in this binder yet.</div>')+'</div></section>'+(b.automatic?'':'<section class="binder-section"><h3>Add owned cards</h3><div class="binder-card-grid">'+(available.length?available.map(c=>cardHTML(c,b.id)).join(''):'<div class="empty">'+(owned.length?'All owned cards are already in this binder.':'No owned cards yet. Use the + button in Collection to record cards you own.')+'</div>')+'</div></section>'):'<div class="empty">Create your first binder to organize selected cards you own.</div>')}
 
 function renderStats(){const t=totals(),done=sets.filter(s=>{const g=cards.filter(c=>c.set===s.code);return g.length&&g.every(c=>qty(c.id)>0)}).length,w=cards.filter(c=>wished(c.id)).length,tr=cards.filter(c=>c.card_type==="trainer"&&qty(c.id)>0).length;$("#content").className="stat-grid";$("#content").innerHTML=[["Unique versions owned",t.versions+" / "+t.total],["Total cards owned",t.quantity],["Pokémon represented",t.pokemon],["Expansions completed",done+" / "+sets.length],["Wishlist entries",w],["Trainer versions owned",tr]].map(([a,b])=>'<article class="stat-panel"><strong>'+b+'</strong><span>'+a.toUpperCase()+'</span></article>').join("");$("#result-count").textContent="Collection overview"}
 function render(){if(!catalogReady)return;const t=totals();$("#stat-owned").textContent=t.quantity.toLocaleString();$("#stat-unique").textContent=t.pokemon.toLocaleString();$("#stat-completion").textContent=t.pct+"%";$("#view-caption").textContent=activeView==="kanto151"?"ORIGINAL 151 · ALL CARD VERSIONS":activeView.toUpperCase();$(".toolbar").style.display=["collection","wishlist"].includes(activeView)?"grid":"none";if(activeView==="kanto151"){renderKanto151();return}else if(activeView==="binders"){renderBinders();return}else if(activeView==="expansions")renderSets();else if(activeView==="pokedex")renderDex();else if(activeView==="stats")renderStats();else{if(activeView==="wishlist")$("#ownership-filter").value="wishlist";else if($("#ownership-filter").value==="wishlist")$("#ownership-filter").value="all";renderCards(filtered())}}
