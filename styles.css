@@ -44,3 +44,11 @@
 .kanto-card.owned{border-color:#8b5cf688}
 
 .binder-columns{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px}.binder-columns select{background:#090d18;border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--text);min-width:66px}
+
+/* Compact, full-card binder gallery */
+.binder-view,.binder-section{min-width:0;overflow:visible}
+.binder-card-grid{display:grid;gap:5px;align-items:start;min-width:0;overflow:visible}
+.binder-card-frame{display:flex;flex-direction:column;align-items:stretch;min-width:0;padding:3px;border:1px solid #34445f;border-radius:5px;background:#0c1423;overflow:visible;box-sizing:border-box}
+.binder-card-frame img{display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:contain;border-radius:2px}
+.binder-image-fallback{aspect-ratio:3/4;display:grid;place-items:center;color:var(--muted);font-size:11px;text-align:center}
+.binder-card-frame .binder-card-toggle{margin-top:3px;padding:4px 2px;font-size:10px}
